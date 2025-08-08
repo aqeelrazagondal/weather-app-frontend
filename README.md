@@ -172,14 +172,6 @@ Note: Changing env values requires restarting the dev server.
 
 ---
 
-## Known Limitations
-
-- Anonymous persistence is per browser profile/machine using a client ID in localStorage. It is not cross-device without authentication.
-- Current weather is per-card (1 request per favourite). For large lists, a backend batch endpoint is recommended.
-- Minimal charts by design to avoid heavy dependencies; sparkline is a lightweight SVG.
-
----
-
 ## Future Improvements
 
 - Backend batch endpoints for current weather to reduce request volume.

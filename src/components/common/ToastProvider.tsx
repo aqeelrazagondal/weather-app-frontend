@@ -1,3 +1,4 @@
+// src/components/common/ToastProvider.tsx
 import React, { createContext, useCallback, useContext, useState } from 'react';
 import { Alert, Snackbar } from '@mui/material';
 
@@ -15,9 +16,7 @@ type ToastContextValue = {
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
-export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
 
@@ -54,6 +53,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export function useToast() {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be used within ToastProvider');
+  if (!ctx) {
+    throw new Error('useToast must be used within ToastProvider');
+  }
   return ctx;
 }

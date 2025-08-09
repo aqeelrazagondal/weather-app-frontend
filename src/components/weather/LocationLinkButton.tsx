@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { Location } from '../../types/weather';
+import { loadWindPrefs } from '../../utils/prefs';
 
 interface Props {
   location: Location;
@@ -11,17 +12,18 @@ interface Props {
 
 const LocationLinkButton: React.FC<Props> = ({ location, size = 'small', variant = 'outlined' }) => {
   const navigate = useNavigate();
+  const prefs = loadWindPrefs();
 
   const handleClick = () => {
-    const name =
-      location.displayName ||
-      [location.name, location.state, location.country].filter(Boolean).join(', ');
     const params = new URLSearchParams({
       lat: String(location.lat),
       lon: String(location.lon),
-      name: encodeURIComponent(name),
+      units: prefs.units,
+      granularity: prefs.granularity,
     });
-    navigate(`/location?${params.toString()}`);
+    if (prefs.granularity === 'hourly') params.set('range', String(prefs.range));
+    else params.set('days', String(prefs.days));
+    navigate(`/forecast?${params.toString()}`);
   };
 
   return (

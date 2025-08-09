@@ -1,3 +1,4 @@
+// src/App.tsx
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -10,6 +11,7 @@ import HomePage from './pages/HomePage';
 import LocationDetailPage from './pages/LocationDetailPage';
 import { queryClient } from './queryClient';
 import { ToastProvider } from './components/common/ToastProvider';
+import ForecastPage from "./components/weather/ForecastPage";
 
 function App() {
   return (
@@ -23,6 +25,7 @@ function App() {
                 <Route path="/" element={<Layout />}>
                   <Route index element={<HomePage />} />
                   <Route path="location" element={<LocationDetailPage />} />
+                  <Route path="forecast" element={<ForecastPage />} />
                 </Route>
               </Routes>
             </BrowserRouter>

@@ -57,18 +57,6 @@ const FavoriteCard: React.FC<Props> = ({ location, onRemove }) => {
 
   return (
     <Card sx={{ overflow: 'hidden', position: 'relative' }}>
-      {/* Subtle top accent bar */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 3,
-          background: 'linear-gradient(90deg, #06b6d4, #2563eb, #7c3aed)',
-          opacity: 0.85,
-        }}
-      />
       <CardContent>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography component="span" sx={{ fontSize: 22 }}>

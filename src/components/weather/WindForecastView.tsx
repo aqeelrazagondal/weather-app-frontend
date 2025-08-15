@@ -1,8 +1,18 @@
-import React from 'react';
-import { Card, CardContent, Typography, Stack, Box, Chip, Tooltip, Avatar } from '@mui/material';
+import React, { useMemo } from 'react';
+import { Card, CardContent, Typography, Stack, Box, useTheme } from '@mui/material';
 import type { WindForecastResponse } from '../../types/windForecast';
 import WindDirection from './WindDirection';
-import ForecastSparkline from './ForecastSparkline';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RTooltip,
+} from 'recharts';
 
 function unitLabel(units: string): string {
   switch (units) {
@@ -22,6 +32,22 @@ interface Props {
 }
 
 const WindForecastView: React.FC<Props> = ({ data, loading, error }) => {
+  const theme = useTheme();
+  const unit = unitLabel(data?.units ?? 'metric');
+  const hourlyData = useMemo(() => {
+    if (!data || data.granularity !== 'hourly') return [] as Array<{ t: string; speed: number; gust: number | null; dir: any }>;
+    return data.hourly.map(h => {
+      const ts = h.timestamp > 1e12 ? h.timestamp : h.timestamp * 1000;
+      const time = new Date(ts);
+      const label = time.toLocaleTimeString([], { hour: '2-digit' });
+      return {
+        t: label,
+        speed: h.windSpeed,
+        gust: typeof h.windGust === 'number' ? h.windGust : null,
+        dir: h.windDirection,
+      };
+    });
+  }, [data]);
   if (loading) {
     return (
       <Card>
@@ -62,117 +88,93 @@ const WindForecastView: React.FC<Props> = ({ data, loading, error }) => {
   }
 
   if (data.granularity === 'hourly') {
-    const speeds = data.hourly.map(h => h.windSpeed);
-    const unit = unitLabel(data.units);
-    const min = Math.min(...speeds);
-    const max = Math.max(...speeds);
-    const range = Math.max(1e-6, max - min);
+    const axisColor = theme.palette.text.secondary;
+    const gridColor = 'rgba(148,163,184,0.16)';
+    const lineColor = theme.palette.primary.main;
+    const gustColor = 'rgba(148,163,184,0.8)';
 
     return (
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>Forecast • Hourly</Typography>
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="subtitle1" gutterBottom>Wind speed over time</Typography>
-              <ForecastSparkline values={speeds} width={240} height={60} />
-              <Box
-                sx={{
-                  mt: 1.5,
-                  display: 'grid',
-                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(6, 1fr)' },
-                  gap: 1,
-                }}
-              >
-                {data.hourly.slice(0, 12).map((h) => {
-                  const intensity = (h.windSpeed - min) / range;
-                  const bgAlpha = 0.08 + intensity * 0.18;
-                  const borderAlpha = 0.15 + intensity * 0.3;
-                  const time = new Date((h.timestamp > 1e12 ? h.timestamp : h.timestamp * 1000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                  return (
-                    <Tooltip
-                      key={h.timestamp}
-                      title={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <WindDirection direction={h.windDirection as any} size={22} showLabel />
-                          <Typography variant="caption">
-                            {h.windSpeed.toFixed(1)} {unit} {h.windGust ? `(gust ${h.windGust.toFixed(1)} ${unit})` : ''} at {time}
-                          </Typography>
-                        </Box>
-                      }
-                      arrow
-                    >
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        sx={{
-                          justifyContent: 'space-between',
-                          bgcolor: `rgba(96, 165, 250, ${bgAlpha})`,
-                          borderColor: `rgba(148,163,184, ${borderAlpha})`,
-                          color: 'text.primary',
-                          fontWeight: 500,
-                          px: 0.5,
-                          height: 34,
-                          '& .MuiChip-label': {
-                            display: 'flex',
-                            width: '100%',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            px: 0.5,
-                            fontSize: 12,
-                          },
-                        }}
-                        avatar={
-                          <Avatar
-                            sx={{
-                              width: 22,
-                              height: 22,
-                              fontSize: 11,
-                              bgcolor: 'rgba(37,99,235,0.35)',
-                              color: 'primary.contrastText',
-                            }}
-                          >
-                            {time.split(':')[0]}
-                          </Avatar>
-                        }
-                        label={
-                          <>
-                            <span>{h.windSpeed.toFixed(1)} {unit}</span>
-                            <span style={{ opacity: 0.8, fontWeight: 400, marginLeft: 8 }}>
-                              {time}
-                            </span>
-                          </>
-                        }
-                      />
-                    </Tooltip>
-                  );
-                })}
-              </Box>
-            </Box>
-          </Stack>
+          <Box sx={{ width: '100%', height: 240 }}>
+            <ResponsiveContainer>
+              <AreaChart data={hourlyData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="windArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={lineColor} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={lineColor} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={gridColor} vertical={false} />
+                <XAxis dataKey="t" tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: gridColor }} interval={Math.ceil(hourlyData.length / 6)} />
+                <YAxis tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: gridColor }} width={36} allowDecimals={false} />
+                <RTooltip
+                  cursor={{ stroke: 'rgba(148,163,184,0.25)' }}
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    const p = payload[0].payload as any;
+                    return (
+                      <Box sx={{ p: 1, border: '1px solid var(--border-color)', bgcolor: '#111827', borderRadius: 1 }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <WindDirection direction={p.dir as any} />
+                          <Typography variant="caption">{label}: {p.speed.toFixed(1)} {unit}{p.gust ? ` (gust ${p.gust.toFixed(1)} ${unit})` : ''}</Typography>
+                        </Stack>
+                      </Box>
+                    );
+                  }}
+                />
+                <Area type="monotone" dataKey="speed" stroke={lineColor} fill="url(#windArea)" strokeWidth={2}
+                  dot={false} />
+                <Line type="monotone" dataKey="gust" stroke={gustColor} strokeDasharray="4 4" dot={false} connectNulls />
+              </AreaChart>
+            </ResponsiveContainer>
+          </Box>
         </CardContent>
       </Card>
     );
   }
 
-  const unit = unitLabel(data.units);
+  const axisColor = theme.palette.text.secondary;
+  const gridColor = 'rgba(148,163,184,0.16)';
+  const lineColor = theme.palette.primary.main;
+  const gustColor = 'rgba(148,163,184,0.8)';
+  const dailyData = data.daily.map(d => ({
+    d: d.date,
+    avg: d.avgWindSpeed,
+    gust: typeof d.maxWindGust === 'number' ? d.maxWindGust : null,
+    dir: d.predominantDirection,
+  }));
   return (
     <Card>
       <CardContent>
         <Typography variant="h6" gutterBottom>Forecast • Daily</Typography>
-        <Stack spacing={1}>
-          {data.daily.map((d) => (
-            <Stack key={d.date} direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2" sx={{ minWidth: 110 }}>{d.date}</Typography>
-              <Typography variant="body2">
-                {d.avgWindSpeed.toFixed(1)} {unit}
-                {typeof d.maxWindGust === 'number' ? ` • gust ${d.maxWindGust.toFixed(1)} ${unit}` : ''}
-              </Typography>
-              <WindDirection direction={d.predominantDirection as any} showLabel />
-            </Stack>
-          ))}
-        </Stack>
+        <Box sx={{ width: '100%', height: 220 }}>
+          <ResponsiveContainer>
+            <LineChart data={dailyData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke={gridColor} vertical={false} />
+              <XAxis dataKey="d" tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: gridColor }} interval={0} />
+              <YAxis tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: gridColor }} width={36} allowDecimals={false} />
+              <RTooltip
+                cursor={{ stroke: 'rgba(148,163,184,0.25)' }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload || payload.length === 0) return null;
+                  const p = payload[0].payload as any;
+                  return (
+                    <Box sx={{ p: 1, border: '1px solid var(--border-color)', bgcolor: '#111827', borderRadius: 1 }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <WindDirection direction={p.dir as any} />
+                        <Typography variant="caption">{label}: {p.avg.toFixed(1)} {unit}{p.gust ? ` (gust ${p.gust.toFixed(1)} ${unit})` : ''}</Typography>
+                      </Stack>
+                    </Box>
+                  );
+                }}
+              />
+              <Line type="monotone" dataKey="avg" stroke={lineColor} strokeWidth={2} dot={{ r: 2, strokeWidth: 0 }} />
+              <Line type="monotone" dataKey="gust" stroke={gustColor} strokeDasharray="4 4" dot={false} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        </Box>
       </CardContent>
     </Card>
   );

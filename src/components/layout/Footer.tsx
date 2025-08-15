@@ -9,7 +9,8 @@ const Footer: React.FC = () => {
         py: 3,
         px: 2,
         mt: 'auto',
-        backgroundColor: (theme) => theme.palette.grey[200],
+        backgroundColor: (theme) => theme.palette.background.paper,
+        borderTop: '1px solid var(--border-color)',
       }}
     >
       <Container maxWidth="lg">

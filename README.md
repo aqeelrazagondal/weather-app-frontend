@@ -25,11 +25,72 @@ A React + TypeScript application to monitor wind conditions for user-selected fa
    npm start
    ```
    App runs at http://localhost:3001 (or the port CRA chooses). Backend should run at the API base URL from your `.env`.
+- Frontend: http://localhost:3001 (CRA default)
+- Backend: http://localhost:3000/v1 (per env)
 
-5. Verify connectivity
-   - Open DevTools → Network
-   - Trigger a search or load the home page
-   - You should see `/v1/locations` and `/v1/location-search` requests including the `X-Client-Id` header.
+5) Verify
+- Open DevTools → Network
+- Interactions should call endpoints like:
+  - GET /v1/locations
+  - GET /v1/location-search?query=...
+  - GET /v1/weather/{lat},{lon}/forecast
+- All requests include header: X-Client-Id: <uuid>
+
+---
+
+## Features Overview
+
+- Favourites Management
+  - Search with autocomplete, disambiguation (displayName, state, country, coords)
+  - Add/remove favourites
+  - Responsive grid (1/2/3 columns) with an intuitive empty state
+  - LocalStorage mirror for instant reload + backend hydration
+
+- Current Conditions
+  - Per-favourite current snapshot derived from the new hourly forecast endpoint
+  - Wind speed, direction indicator (cardinal + rotating arrow), temperature
+  - Stable loading skeleton and error fallback
+
+- Forecast View
+  - Route: `/forecast?lat={lat}&lon={lon}&units={u}&granularity={g}&range={r}|days={d}`
+  - Hourly: chips show hour + windSpeed (+ gust if present) and timeline sparkline
+  - Daily: list shows avg wind speed, predominant direction (+ max gust)
+  - Controls: Units (standard|metric|imperial), granularity (hourly|daily), range/days sliders
+  - Preferences persisted in localStorage and synced to the URL
+
+- UX/Styling
+  - Dark modern theme with gradient AppBar and subtle card animations
+  - Snackbars for add/remove confirmations (ToastProvider)
+  - Layout with error boundary and accessible focus outlines
+
+---
+
+## Architecture
+
+- React 19 + TypeScript
+- MUI for UI
+- React Query for server caching (wind/current/forecast)
+- Redux Toolkit for favourites list (local + server merge)
+- Axios API client (baseURL from env, X-Client-Id interceptor)
+
+### Data Flow
+
+- Client ID
+  - Persistent UUID in localStorage
+  - Sent as X-Client-Id for scoping favourites server-side
+- Favourites
+  - Source of truth: backend
+  - Mirror: localStorage (fast first paint)
+  - On load: fetch server favourites and merge with local mirror to preserve displayName/state/countryName/coords
+- Current Weather
+  - Built from the new hourly endpoint (smallest range=3) to avoid legacy `/weather/current`
+- Forecast
+  - New backend endpoint: `GET /v1/weather/{lat},{lon}/forecast`
+  - Query: `units`, `granularity` (hourly/daily), `range` or `days` (validated client-side)
+  - Hourly returns `windSpeed`, `windGust?`, `windDirectionDeg`, `windDirection` (16-point), `temperature`, `timestamp`
+  - Daily returns `avgWindSpeed`, `predominantDirection`, `maxWindGust?`, `date`
+
+### Project Structure (high-level)
 
 ---
 
@@ -210,3 +271,80 @@ Note: Changing env values requires restarting the dev server.
 ---
 
 ## Contact
+
+---
+
+## API Integration
+
+Base URL from env: `REACT_APP_API_BASE_URL` (defaults to `/v1` for proxy dev).
+
+Requests include header:
+
+Endpoints used:
+- Favourites
+  - GET `/v1/locations`
+  - POST `/v1/locations` (payload: `{ name, latitude, longitude }`)
+  - DELETE `/v1/locations/{id}`
+- Location search
+  - GET `/v1/location-search?query=<q>`
+- Current/Forecast
+  - NEW: GET `/v1/weather/{lat},{lon}/forecast?units=&granularity=&range=&days=`
+    - Hourly: `granularity=hourly&range=3..120 (step 3)`
+    - Daily: `granularity=daily&days=1..7`
+  - Legacy (kept for LocationDetailPage): GET `/v1/weather/forecast?lat=&lon=`
+    - Consider migrating to the new endpoint fully
+
+Error handling:
+- 400 → “Invalid parameters or location not supported”
+- 429 → “Too many requests. Please try again shortly”
+- Others → generic message with retry option
+
+---
+
+## Caching, Rate Limits, and Performance
+
+- React Query
+  - current: `staleTime ~3m`, `retry: 1`, `refetchOnWindowFocus: false`
+  - forecast (new): `staleTime ~5–10m`, `retry: 1` except 429 → no retry
+  - `gcTime` tuned for navigation friendliness
+- Search
+  - Debounced 300ms
+- Optional server optimization
+  - Batch current endpoint can be added server-side to reduce per-card calls if many favourites exist
+
+---
+
+## State & Persistence
+
+- Redux (favourites slice)
+  - Avoid duplicate adds by ID or proximity (Haversine distance <500m)
+  - LocalStorage persistence (mirror) + merge on hydration (preserves rich metadata like displayName)
+- Preferences
+  - Units, granularity, range/days stored in localStorage
+  - Synced to URL on ForecastPage
+
+---
+
+## Routing
+
+- `/` (HomePage)
+  - Search + favourites grid
+  - Cards show current summary, “View forecast”, remove button
+- `/location?lat=&lon=&name=` (legacy detail)
+  - Current card + legacy ForecastView (consider migrating)
+- `/forecast?lat=&lon=&units=&granularity=&range|days` (new ForecastPage)
+  - Controls for units, granularity, range/days
+  - WindForecastView for hourly/daily data
+
+Header title “Weather Alert” navigates to home.
+
+---
+
+## Styling & Accessibility
+
+- Dark theme, gradient app bar, subtle animations on cards (respects reduced motion)
+- Accessible labels on controls, focus outlines via CssBaseline overrides
+- Compact chips for hourly view with tooltips indicating direction/speed/time
+
+---
+
